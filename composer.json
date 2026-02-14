@@ -1,23 +1,46 @@
 {
-  "name": "x-laravel/listmonk",
-  "description": "A Laravel package for listmonk API integration.",
+  "name": "xlaravel/listmonk",
+  "description": "Laravel integration for Listmonk - Self-hosted newsletter and mailing list manager",
+  "keywords": [
+    "laravel",
+    "listmonk",
+    "newsletter",
+    "email",
+    "mailing-list",
+    "subscription"
+  ],
   "type": "library",
   "license": "MIT",
   "authors": [
     {
-      "name": "Mehmet ÖĞMEN",
-      "email": "www@mehmetogmen.com.tr",
-      "homepage": "https://www.mehmetogmen.com.tr",
-      "role": "Developer"
+      "name": "XLaravel",
+      "email": "info@xlaravel.com"
     }
   ],
   "require": {
-    "php": "^8.2",
-    "laravel/framework": "^11.0"
+    "php": "^8.1|^8.2|^8.3",
+    "illuminate/support": "^10.0|^11.0",
+    "illuminate/http": "^10.0|^11.0",
+    "illuminate/database": "^10.0|^11.0",
+    "illuminate/queue": "^10.0|^11.0",
+    "guzzlehttp/guzzle": "^7.0"
+  },
+  "require-dev": {
+    "orchestra/testbench": "^8.0|^9.0",
+    "phpunit/phpunit": "^10.0",
+    "mockery/mockery": "^1.5"
   },
   "autoload": {
     "psr-4": {
       "XLaravel\\Listmonk\\": "src/"
+    },
+    "files": [
+      "src/helpers.php"
+    ]
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "XLaravel\\Listmonk\\Tests\\": "tests/"
     }
   },
   "extra": {
@@ -25,10 +48,18 @@
       "providers": [
         "XLaravel\\Listmonk\\ListmonkServiceProvider"
       ],
-      "alias": {
+      "aliases": {
         "Listmonk": "XLaravel\\Listmonk\\Facades\\Listmonk"
       }
     }
+  },
+  "scripts": {
+    "test": "vendor/bin/phpunit",
+    "test-coverage": "vendor/bin/phpunit --coverage-html coverage"
+  },
+  "config": {
+    "sort-packages": true,
+    "optimize-autoloader": true
   },
   "minimum-stability": "dev",
   "prefer-stable": true
