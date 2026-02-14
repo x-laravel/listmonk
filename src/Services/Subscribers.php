@@ -4,7 +4,6 @@ namespace XLaravel\Listmonk\Services;
 
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use XLaravel\Listmonk\Contracts\NewsletterSubscriber;
 use XLaravel\Listmonk\Events\SubscriberSubscribed;
@@ -36,8 +35,6 @@ class Subscribers
     public function sync(NewsletterSubscriber $model): void
     {
         try {
-            $this->checkRateLimit();
-
             $email = $model->getNewsletterEmail();
 
             // Validate email format
@@ -336,38 +333,6 @@ class Subscribers
                 $e
             );
         }
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | RATE LIMITING
-    |--------------------------------------------------------------------------
-    */
-
-    /**
-     * Check if rate limit is exceeded.
-     *
-     * @throws ListmonkApiException
-     */
-    protected function checkRateLimit(): void
-    {
-        if (!config('listmonk.rate_limit.enabled', false)) {
-            return;
-        }
-
-        $key = 'listmonk:rate_limit';
-        $maxAttempts = config('listmonk.rate_limit.max_attempts', 60);
-        $decayMinutes = config('listmonk.rate_limit.decay_minutes', 1);
-
-        $attempts = Cache::get($key, 0);
-
-        if ($attempts >= $maxAttempts) {
-            throw new ListmonkApiException(
-                "Rate limit exceeded. Maximum {$maxAttempts} requests per {$decayMinutes} minute(s)."
-            );
-        }
-
-        Cache::put($key, $attempts + 1, now()->addMinutes($decayMinutes));
     }
 
     /*

@@ -12,18 +12,6 @@ return [
     */
     'preconfirm_subscriptions' => env('LISTMONK_PRECONFIRM_SUBSCRIPTIONS', true),
 
-    /*
-    |--------------------------------------------------------------------------
-    | Rate Limiting
-    |--------------------------------------------------------------------------
-    | Prevent too many API requests to Listmonk in a short time period.
-    */
-    'rate_limit' => [
-        'enabled' => env('LISTMONK_RATE_LIMIT_ENABLED', false),
-        'max_attempts' => env('LISTMONK_RATE_LIMIT_ATTEMPTS', 60),
-        'decay_minutes' => env('LISTMONK_RATE_LIMIT_DECAY', 1),
-    ],
-
     'queue' => [
         'enabled' => env('LISTMONK_QUEUE_ENABLED', true),
 

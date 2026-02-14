@@ -184,22 +184,5 @@ class ListmonkServiceProvider extends ServiceProvider
                 'LISTMONK_QUEUE_TRIES must be a positive integer.'
             );
         }
-
-        // Rate limit validation
-        if (config('listmonk.rate_limit.enabled', false)) {
-            $maxAttempts = config('listmonk.rate_limit.max_attempts');
-            if (!is_numeric($maxAttempts) || $maxAttempts < 1) {
-                throw new \RuntimeException(
-                    'LISTMONK_RATE_LIMIT_ATTEMPTS must be a positive integer.'
-                );
-            }
-
-            $decayMinutes = config('listmonk.rate_limit.decay_minutes');
-            if (!is_numeric($decayMinutes) || $decayMinutes < 1) {
-                throw new \RuntimeException(
-                    'LISTMONK_RATE_LIMIT_DECAY must be a positive integer (minutes).'
-                );
-            }
-        }
     }
 }
