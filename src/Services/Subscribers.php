@@ -40,7 +40,7 @@ class Subscribers
             // Validate email format
             $this->validateEmail($email);
 
-            Log::info('Starting Listmonk sync', [
+            Log::debug('Starting Listmonk sync', [
                 'email' => $email,
                 'model' => get_class($model),
                 'lists' => $model->getNewsletterLists()
@@ -52,7 +52,7 @@ class Subscribers
             if ($remote) {
                 // Subscriber exists - update it
                 $response = $this->updateRemote($remote, $model);
-                Log::info('Subscriber updated in Listmonk', [
+                Log::debug('Subscriber updated in Listmonk', [
                     'email' => $email,
                     'listmonk_id' => $remote['id']
                 ]);
@@ -61,7 +61,7 @@ class Subscribers
             } else {
                 // Subscriber doesn't exist - create it
                 $response = $this->createRemote($model);
-                Log::info('Subscriber created in Listmonk', [
+                Log::debug('Subscriber created in Listmonk', [
                     'email' => $email,
                     'listmonk_id' => $response['data']['id'] ?? null
                 ]);
@@ -125,7 +125,7 @@ class Subscribers
             // Validate email format
             $this->validateEmail($email);
 
-            Log::info('Attempting to unsubscribe from Listmonk', [
+            Log::debug('Attempting to unsubscribe from Listmonk', [
                 'email' => $email,
                 'model' => get_class($model)
             ]);
@@ -134,7 +134,7 @@ class Subscribers
 
             if (!$remote) {
                 // Subscriber doesn't exist in Listmonk - this is OK, just log and return
-                Log::info('Subscriber not found in Listmonk for unsubscribe (already unsubscribed or never subscribed)', [
+                Log::debug('Subscriber not found in Listmonk for unsubscribe (already unsubscribed or never subscribed)', [
                     'email' => $email
                 ]);
                 return;
@@ -360,21 +360,6 @@ class Subscribers
         if (str_contains($email, ' ')) {
             throw new \InvalidArgumentException("Email address cannot contain spaces: {$email}");
         }
-    }
-
-    /**
-     * Generate an idempotency key for a subscriber operation.
-     * This can be used to prevent duplicate operations.
-     *
-     * @return string
-     */
-    protected function getIdempotencyKey(NewsletterSubscriber $model): string
-    {
-        return hash('sha256', implode('|', [
-            $model->getNewsletterEmail(),
-            get_class($model),
-            date('Y-m-d') // Daily idempotency
-        ]));
     }
 
     /**
