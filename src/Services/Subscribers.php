@@ -15,9 +15,7 @@ use XLaravel\Listmonk\Exceptions\ListmonkConnectionException;
 
 class Subscribers
 {
-    public function __construct(
-        protected PendingRequest $client
-    )
+    public function __construct(protected PendingRequest $client)
     {
     }
 

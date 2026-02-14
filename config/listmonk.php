@@ -1,6 +1,15 @@
 <?php
 
 return [
+    /*
+    |--------------------------------------------------------------------------
+    | Listmonk API Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Base URL and credentials for your Listmonk instance.
+    |
+    */
+
     'base_url' => env('LISTMONK_BASE_URL', 'http://localhost:9000'),
     'api_user' => env('LISTMONK_API_USER'),
     'api_token' => env('LISTMONK_API_TOKEN'),
@@ -9,20 +18,28 @@ return [
     |--------------------------------------------------------------------------
     | Subscription Settings
     |--------------------------------------------------------------------------
+    |
+    | preconfirm_subscriptions: Automatically confirm new subscriptions without
+    | requiring email confirmation. Set to false for public signup forms.
+    |
     */
+
     'preconfirm_subscriptions' => env('LISTMONK_PRECONFIRM_SUBSCRIPTIONS', true),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Queue Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Configure Laravel queue behavior for sync operations.
+    |
+    */
 
     'queue' => [
         'enabled' => env('LISTMONK_QUEUE_ENABLED', true),
-
-        // Laravel queue connection name
         'connection' => env('LISTMONK_QUEUE_CONNECTION', null),
-
-        // Queue name (örnek: emails, low, high vs.)
         'queue' => env('LISTMONK_QUEUE_NAME', null),
-
-        // Job behaviour
-        'delay' => env('LISTMONK_QUEUE_DELAY', 0), // seconds
+        'delay' => env('LISTMONK_QUEUE_DELAY', 0),
         'tries' => env('LISTMONK_QUEUE_TRIES', 3),
         'backoff' => env('LISTMONK_QUEUE_BACKOFF', '10,30,60'),
     ],
@@ -31,6 +48,11 @@ return [
     |--------------------------------------------------------------------------
     | Default Lists
     |--------------------------------------------------------------------------
+    |
+    | Default list IDs to subscribe users to. Can be overridden per-model
+    | by implementing getNewsletterLists() method.
+    |
     */
+
     'default_lists' => [],
 ];
