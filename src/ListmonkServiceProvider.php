@@ -2,12 +2,13 @@
 
 namespace XLaravel\Listmonk;
 
+use Illuminate\Contracts\Support\DeferrableProvider;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use XLaravel\Listmonk\Services\Subscribers;
 
-class ListmonkServiceProvider extends ServiceProvider
+class ListmonkServiceProvider extends ServiceProvider implements DeferrableProvider
 {
     /**
      * Register any application services.
@@ -32,7 +33,36 @@ class ListmonkServiceProvider extends ServiceProvider
     {
         $this->registerPublishing();
         $this->registerCommands();
-        $this->validateConfiguration();
+
+        // Validation sadece console'da değilse çalışsın
+        // Console'da zaten command ilk çalıştığında hata verecek
+        if (!$this->app->runningInConsole()) {
+            $this->validateConfiguration();
+        }
+    }
+
+    /**
+     * Get the services provided by the provider.
+     *
+     * Web request'lerinde deferred olarak yüklenir.
+     * Console'da normal yüklenir (commands için).
+     *
+     * @return array<int, string>
+     */
+    public function provides(): array
+    {
+        // Console'da deferred olma, commands register olsun
+        if ($this->app->runningInConsole()) {
+            return [];
+        }
+
+        // Web request'lerinde sadece gerektiğinde yükle
+        return [
+            'listmonk',
+            Listmonk::class,
+            Subscribers::class,
+            PendingRequest::class,
+        ];
     }
 
     /**
