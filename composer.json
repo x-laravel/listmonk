@@ -1,0 +1,35 @@
+{
+  "name": "x-laravel/listmonk",
+  "description": "A Laravel package for listmonk API integration.",
+  "type": "library",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Mehmet ÖĞMEN",
+      "email": "www@mehmetogmen.com.tr",
+      "homepage": "https://www.mehmetogmen.com.tr",
+      "role": "Developer"
+    }
+  ],
+  "require": {
+    "php": "^8.2",
+    "laravel/framework": "^11.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "XLaravel\\Listmonk\\": "src/"
+    }
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "XLaravel\\Listmonk\\ListmonkServiceProvider"
+      ],
+      "alias": {
+        "Listmonk": "XLaravel\\Listmonk\\Facades\\Listmonk"
+      }
+    }
+  },
+  "minimum-stability": "dev",
+  "prefer-stable": true
+}
