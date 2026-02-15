@@ -1,5 +1,5 @@
 {
-  "name": "xlaravel/listmonk",
+  "name": "x-laravel/listmonk",
   "description": "Laravel integration for Listmonk - Self-hosted newsletter and mailing list manager",
   "keywords": [
     "laravel",
@@ -13,21 +13,21 @@
   "license": "MIT",
   "authors": [
     {
-      "name": "XLaravel",
-      "email": "info@xlaravel.com"
+      "name": "Mehmet ÖĞMEN",
+      "email": "www@mehmetogmen.com.tr",
+      "homepage": "https://www.mehmetogmen.com.tr",
+      "role": "Developer"
     }
   ],
   "require": {
-    "php": "^8.1|^8.2|^8.3",
-    "illuminate/support": "^10.0|^11.0",
-    "illuminate/http": "^10.0|^11.0",
-    "illuminate/database": "^10.0|^11.0",
-    "illuminate/queue": "^10.0|^11.0",
-    "guzzlehttp/guzzle": "^7.0"
+    "php": "^8.1",
+    "illuminate/support": "^10.0|^11.0|^12.0",
+    "illuminate/http": "^10.0|^11.0|^12.0",
+    "illuminate/queue": "^10.0|^11.0|^12.0"
   },
   "require-dev": {
-    "orchestra/testbench": "^8.0|^9.0",
-    "phpunit/phpunit": "^10.0",
+    "orchestra/testbench": "^8.0|^9.0|^10.0",
+    "phpunit/phpunit": "^10.0|^11.0",
     "mockery/mockery": "^1.5"
   },
   "autoload": {
@@ -61,6 +61,5 @@
     "sort-packages": true,
     "optimize-autoloader": true
   },
-  "minimum-stability": "dev",
-  "prefer-stable": true
+  "minimum-stability": "stable"
 }

@@ -2,7 +2,6 @@
 
 namespace XLaravel\Listmonk;
 
-use Illuminate\Contracts\Support\DeferrableProvider;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
@@ -10,7 +9,7 @@ use XLaravel\Listmonk\Services\Lists;
 use XLaravel\Listmonk\Services\NewsletterManager;
 use XLaravel\Listmonk\Services\Subscribers;
 
-class ListmonkServiceProvider extends ServiceProvider implements DeferrableProvider
+class ListmonkServiceProvider extends ServiceProvider
 {
     /**
      * Register any application services.
@@ -38,38 +37,6 @@ class ListmonkServiceProvider extends ServiceProvider implements DeferrableProvi
         $this->registerPublishing();
         $this->registerCommands();
         $this->registerObserver();
-
-        // Validation sadece console'da değilse çalışsın
-        // Console'da zaten command ilk çalıştığında hata verecek
-        if (!$this->app->runningInConsole()) {
-            $this->validateConfiguration();
-        }
-    }
-
-    /**
-     * Get the services provided by the provider.
-     *
-     * Web request'lerinde deferred olarak yüklenir.
-     * Console'da normal yüklenir (commands için).
-     *
-     * @return array<int, string>
-     */
-    public function provides(): array
-    {
-        // Console'da deferred olma, commands register olsun
-        if ($this->app->runningInConsole()) {
-            return [];
-        }
-
-        // Web request'lerinde sadece gerektiğinde yükle
-        return [
-            'listmonk',
-            Listmonk::class,
-            Subscribers::class,
-            Lists::class,
-            NewsletterManager::class,
-            PendingRequest::class,
-        ];
     }
 
     /**
@@ -200,73 +167,18 @@ class ListmonkServiceProvider extends ServiceProvider implements DeferrableProvi
      */
     protected function registerObserver(): void
     {
-        // Get all loaded classes
         $declaredClasses = get_declared_classes();
 
         foreach ($declaredClasses as $class) {
-            // Skip non-model classes
             if (!is_subclass_of($class, \Illuminate\Database\Eloquent\Model::class)) {
                 continue;
             }
 
-            // Check if model uses InteractsWithNewsletter trait
             $traits = class_uses_recursive($class);
 
             if (in_array(\XLaravel\Listmonk\Traits\InteractsWithNewsletter::class, $traits)) {
                 $class::observe(\XLaravel\Listmonk\Observers\NewsletterSubscriberObserver::class);
             }
-        }
-    }
-
-    /**
-     * Validate that required configuration is present.
-     */
-    protected function validateConfiguration(): void
-    {
-        // Base URL validation
-        $baseUrl = config('listmonk.base_url');
-        if (empty($baseUrl)) {
-            throw new \RuntimeException(
-                'Listmonk base URL is not configured. ' .
-                'Please set LISTMONK_BASE_URL in your .env file.'
-            );
-        }
-
-        if (!filter_var($baseUrl, FILTER_VALIDATE_URL)) {
-            throw new \RuntimeException(
-                "Invalid Listmonk base URL format: {$baseUrl}"
-            );
-        }
-
-        // Preconfirm validation
-        $preconfirm = config('listmonk.preconfirm_subscriptions');
-        if (!is_bool($preconfirm)) {
-            throw new \RuntimeException(
-                'LISTMONK_PRECONFIRM_SUBSCRIPTIONS must be true or false (boolean).'
-            );
-        }
-
-        // Default lists validation
-        $defaultLists = config('listmonk.default_lists', []);
-        if (!is_array($defaultLists)) {
-            throw new \RuntimeException(
-                'listmonk.default_lists must be an array.'
-            );
-        }
-
-        // Queue configuration validation
-        $queueEnabled = config('listmonk.queue.enabled');
-        if (!is_bool($queueEnabled)) {
-            throw new \RuntimeException(
-                'LISTMONK_QUEUE_ENABLED must be true or false (boolean).'
-            );
-        }
-
-        $tries = config('listmonk.queue.tries', 3);
-        if (!is_numeric($tries) || $tries < 1) {
-            throw new \RuntimeException(
-                'LISTMONK_QUEUE_TRIES must be a positive integer.'
-            );
         }
     }
 }
