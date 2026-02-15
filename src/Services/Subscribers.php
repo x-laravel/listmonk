@@ -38,31 +38,17 @@ class Subscribers
             // Validate email format
             $this->validateEmail($email);
 
-            Log::debug('Starting Listmonk sync', [
-                'email' => $email,
-                'model' => get_class($model),
-                'lists' => $model->getNewsletterLists()
-            ]);
-
             // Fetch subscriber from Listmonk by email
             $remote = $this->fetchRemoteByEmail($email);
 
             if ($remote) {
                 // Subscriber exists - update it
                 $response = $this->updateRemote($remote, $model);
-                Log::debug('Subscriber updated in Listmonk', [
-                    'email' => $email,
-                    'listmonk_id' => $remote['id']
-                ]);
 
                 event(new SubscriberSynced($model, $response));
             } else {
                 // Subscriber doesn't exist - create it
                 $response = $this->createRemote($model);
-                Log::debug('Subscriber created in Listmonk', [
-                    'email' => $email,
-                    'listmonk_id' => $response['data']['id'] ?? null
-                ]);
 
                 event(new SubscriberSubscribed($model, $response));
             }
@@ -93,20 +79,11 @@ class Subscribers
             // Validate email format
             $this->validateEmail($email);
 
-            Log::debug('Starting partial Listmonk update', [
-                'email' => $email,
-                'fields' => $fields,
-                'model' => get_class($model)
-            ]);
-
             // Fetch current subscriber data
             $remote = $this->fetchRemoteByEmail($email);
 
             if (!$remote) {
                 // Subscriber doesn't exist - do full sync instead
-                Log::warning('Subscriber not found for partial update, doing full sync', [
-                    'email' => $email
-                ]);
                 $this->sync($model);
                 return;
             }
@@ -131,12 +108,6 @@ class Subscribers
                     $response->status()
                 );
             }
-
-            Log::debug('Subscriber partially updated in Listmonk', [
-                'email' => $email,
-                'listmonk_id' => $remote['id'],
-                'updated_fields' => $fields
-            ]);
 
             event(new SubscriberSynced($model, $response->json()));
 
@@ -177,17 +148,9 @@ class Subscribers
             // Validate email format
             $this->validateEmail($email);
 
-            Log::debug('Moving subscriber to passive list', [
-                'email' => $email,
-                'passive_list_id' => $passiveListId
-            ]);
-
             $remote = $this->fetchRemoteByEmail($email);
 
             if (!$remote) {
-                Log::debug('Subscriber not found for passive list move (already removed)', [
-                    'email' => $email
-                ]);
                 return;
             }
 
@@ -209,12 +172,6 @@ class Subscribers
                     $response->status()
                 );
             }
-
-            Log::info('Subscriber moved to passive list', [
-                'email' => $email,
-                'listmonk_id' => $remote['id'],
-                'passive_list_id' => $passiveListId
-            ]);
 
         } catch (ListmonkApiException $e) {
             throw $e;
@@ -242,16 +199,9 @@ class Subscribers
             // Validate email format
             $this->validateEmail($email);
 
-            Log::debug('Attempting to delete subscriber from Listmonk', [
-                'email' => $email
-            ]);
-
             $remote = $this->fetchRemoteByEmail($email);
 
             if (!$remote) {
-                Log::debug('Subscriber not found in Listmonk for deletion (already deleted or never subscribed)', [
-                    'email' => $email
-                ]);
                 return;
             }
 
@@ -265,10 +215,8 @@ class Subscribers
                 );
             }
 
-            Log::info('Subscriber deleted from Listmonk', [
-                'email' => $email,
-                'listmonk_id' => $remote['id']
-            ]);
+            // Note: We can't fire SubscriberUnsubscribed event here because we don't have the model
+            // Event is only fired when unsubscribe() is called with a model
 
         } catch (ListmonkApiException $e) {
             Log::error('Listmonk deletion failed', [
@@ -310,8 +258,6 @@ class Subscribers
             }
         }
 
-        Log::info('Bulk sync completed', $results);
-
         return $results;
     }
 
@@ -323,6 +269,9 @@ class Subscribers
     {
         $email = $model->getNewsletterEmail();
         $this->unsubscribeByEmail($email);
+
+        // Fire event
+        event(new SubscriberUnsubscribed($model));
     }
 
     /*

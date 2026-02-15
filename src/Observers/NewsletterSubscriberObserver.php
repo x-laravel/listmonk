@@ -2,7 +2,6 @@
 
 namespace XLaravel\Listmonk\Observers;
 
-use Illuminate\Support\Facades\Log;
 use XLaravel\Listmonk\Contracts\NewsletterSubscriber;
 use XLaravel\Listmonk\Services\Subscribers;
 
@@ -17,11 +16,6 @@ class NewsletterSubscriberObserver
         if (!$this->shouldSync($model)) {
             return;
         }
-
-        Log::debug('NewsletterSubscriberObserver: created event', [
-            'model' => get_class($model),
-            'email' => $model->getNewsletterEmail()
-        ]);
 
         $model->subscribeToNewsletter();
     }
@@ -56,14 +50,6 @@ class NewsletterSubscriberObserver
             return;
         }
 
-        Log::debug('NewsletterSubscriberObserver: updated event', [
-            'model' => get_class($model),
-            'email' => $model->getNewsletterEmail(),
-            'changed_fields' => $changedFields,
-            'email_column' => $emailColumn,
-            'name_column' => $nameColumn
-        ]);
-
         // If email changed, handle old email cleanup
         if ($emailChanged) {
             $this->handleEmailChange($model, $emailColumn);
@@ -86,12 +72,6 @@ class NewsletterSubscriberObserver
         $oldEmail = $model->getOriginal($emailColumn);
         $newEmail = $model->{$emailColumn};
 
-        Log::info('NewsletterSubscriberObserver: email changed', [
-            'model' => get_class($model),
-            'old_email' => $oldEmail,
-            'new_email' => $newEmail
-        ]);
-
         $behavior = config('listmonk.email_change_behavior', 'delete');
         $passiveListId = $model->getNewsletterPassiveListId();
 
@@ -103,7 +83,6 @@ class NewsletterSubscriberObserver
             } else {
                 app(\XLaravel\Listmonk\Services\Subscribers::class)->moveToPassiveListByEmail($oldEmail, $passiveListId);
             }
-            Log::debug('Old email will be moved to passive list', ['old_email' => $oldEmail]);
         } else {
             // Delete old email completely
             if (config('listmonk.queue.enabled')) {
@@ -111,7 +90,6 @@ class NewsletterSubscriberObserver
             } else {
                 app(\XLaravel\Listmonk\Services\Subscribers::class)->unsubscribeByEmail($oldEmail);
             }
-            Log::debug('Old email will be deleted', ['old_email' => $oldEmail]);
         }
 
         // Subscribe new email
@@ -131,19 +109,9 @@ class NewsletterSubscriberObserver
         // Check if this is a soft delete
         if (method_exists($model, 'isForceDeleting') && !$model->isForceDeleting()) {
             // Soft delete - move to passive list
-            Log::debug('NewsletterSubscriberObserver: soft deleted event', [
-                'model' => get_class($model),
-                'email' => $model->getNewsletterEmail()
-            ]);
-
             $model->moveToPassiveList();
         } else {
             // Force delete - unsubscribe
-            Log::debug('NewsletterSubscriberObserver: force deleted event', [
-                'model' => get_class($model),
-                'email' => $model->getNewsletterEmail()
-            ]);
-
             $model->moveToPassiveList();
         }
     }
@@ -158,11 +126,6 @@ class NewsletterSubscriberObserver
             return;
         }
 
-        Log::debug('NewsletterSubscriberObserver: force deleted event', [
-            'model' => get_class($model),
-            'email' => $model->getNewsletterEmail()
-        ]);
-
         $model->moveToPassiveList();
     }
 
@@ -175,11 +138,6 @@ class NewsletterSubscriberObserver
         if (!$this->shouldSync($model)) {
             return;
         }
-
-        Log::debug('NewsletterSubscriberObserver: restored event', [
-            'model' => get_class($model),
-            'email' => $model->getNewsletterEmail()
-        ]);
 
         $model->subscribeToNewsletter();
     }

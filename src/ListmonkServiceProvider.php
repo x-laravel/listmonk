@@ -6,7 +6,6 @@ use Illuminate\Contracts\Support\DeferrableProvider;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use XLaravel\Listmonk\Services\Subscribers;
 
 class ListmonkServiceProvider extends ServiceProvider implements DeferrableProvider
@@ -188,10 +187,6 @@ class ListmonkServiceProvider extends ServiceProvider implements DeferrableProvi
 
             if (in_array(\XLaravel\Listmonk\Traits\InteractsWithNewsletter::class, $traits)) {
                 $class::observe(\XLaravel\Listmonk\Observers\NewsletterSubscriberObserver::class);
-
-                Log::debug('Registered NewsletterSubscriberObserver for model', [
-                    'model' => $class
-                ]);
             }
         }
     }
