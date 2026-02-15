@@ -3,7 +3,7 @@
 namespace XLaravel\Listmonk\Observers;
 
 use XLaravel\Listmonk\Contracts\NewsletterSubscriber;
-use XLaravel\Listmonk\Services\Subscribers;
+use XLaravel\Listmonk\Services\NewsletterManager;
 
 class NewsletterSubscriberObserver
 {
@@ -60,7 +60,7 @@ class NewsletterSubscriberObserver
         if (config('listmonk.queue.enabled')) {
             \XLaravel\Listmonk\Jobs\UpdateSubscriptionJob::dispatch($model);
         } else {
-            app(Subscribers::class)->updatePartial($model, $changedFields);
+            app(NewsletterManager::class)->updatePartial($model, $changedFields);
         }
     }
 
@@ -81,14 +81,14 @@ class NewsletterSubscriberObserver
             if (config('listmonk.queue.enabled')) {
                 \XLaravel\Listmonk\Jobs\MoveToPassiveListJobByEmail::dispatch($oldEmail, $passiveListId);
             } else {
-                app(\XLaravel\Listmonk\Services\Subscribers::class)->moveToPassiveListByEmail($oldEmail, $passiveListId);
+                app(NewsletterManager::class)->moveToPassiveListByEmail($oldEmail, $passiveListId);
             }
         } else {
             // Delete old email completely
             if (config('listmonk.queue.enabled')) {
                 \XLaravel\Listmonk\Jobs\UnsubscribeJobByEmail::dispatch($oldEmail);
             } else {
-                app(\XLaravel\Listmonk\Services\Subscribers::class)->unsubscribeByEmail($oldEmail);
+                app(NewsletterManager::class)->unsubscribeByEmail($oldEmail);
             }
         }
 

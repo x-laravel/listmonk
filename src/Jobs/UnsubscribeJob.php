@@ -8,7 +8,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use XLaravel\Listmonk\Contracts\NewsletterSubscriber;
-use XLaravel\Listmonk\Services\Subscribers;
+use XLaravel\Listmonk\Services\NewsletterManager;
 
 class UnsubscribeJob implements ShouldQueue
 {
@@ -64,7 +64,7 @@ class UnsubscribeJob implements ShouldQueue
             ->toArray();
     }
 
-    public function handle(Subscribers $service): void
+    public function handle(NewsletterManager $service): void
     {
         try {
             $service->unsubscribe($this->model);

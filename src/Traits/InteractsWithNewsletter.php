@@ -2,7 +2,7 @@
 
 namespace XLaravel\Listmonk\Traits;
 
-use XLaravel\Listmonk\Services\Subscribers;
+use XLaravel\Listmonk\Services\NewsletterManager;
 use XLaravel\Listmonk\Jobs\SubscribeJob;
 use XLaravel\Listmonk\Jobs\UnsubscribeJob;
 use XLaravel\Listmonk\Jobs\UpdateSubscriptionJob;
@@ -117,7 +117,7 @@ trait InteractsWithNewsletter
             return;
         }
 
-        app(Subscribers::class)->sync($this);
+        app(NewsletterManager::class)->sync($this);
     }
 
     public function unsubscribeFromNewsletter(): void
@@ -127,7 +127,7 @@ trait InteractsWithNewsletter
             return;
         }
 
-        app(Subscribers::class)->unsubscribe($this);
+        app(NewsletterManager::class)->unsubscribe($this);
     }
 
     public function updateNewsletterSubscription(): void
@@ -137,7 +137,7 @@ trait InteractsWithNewsletter
             return;
         }
 
-        app(Subscribers::class)->sync($this);
+        app(NewsletterManager::class)->sync($this);
     }
 
     public function moveToPassiveList(): void
@@ -149,7 +149,7 @@ trait InteractsWithNewsletter
             return;
         }
 
-        app(Subscribers::class)->moveToPassiveList($this, $passiveListId);
+        app(NewsletterManager::class)->moveToPassiveList($this, $passiveListId);
     }
 
     /*

@@ -6,6 +6,8 @@ use Illuminate\Contracts\Support\DeferrableProvider;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
+use XLaravel\Listmonk\Services\Lists;
+use XLaravel\Listmonk\Services\NewsletterManager;
 use XLaravel\Listmonk\Services\Subscribers;
 
 class ListmonkServiceProvider extends ServiceProvider implements DeferrableProvider
@@ -21,6 +23,8 @@ class ListmonkServiceProvider extends ServiceProvider implements DeferrableProvi
         $this->registerConfig();
         $this->registerHttpClient();
         $this->registerSubscribersService();
+        $this->registerListsService();
+        $this->registerNewsletterManager();
         $this->registerMainBinding();
     }
 
@@ -62,6 +66,8 @@ class ListmonkServiceProvider extends ServiceProvider implements DeferrableProvi
             'listmonk',
             Listmonk::class,
             Subscribers::class,
+            Lists::class,
+            NewsletterManager::class,
             PendingRequest::class,
         ];
     }
@@ -113,16 +119,37 @@ class ListmonkServiceProvider extends ServiceProvider implements DeferrableProvi
     }
 
     /**
-     * Register the Subscribers service.
-     *
-     * This service handles all subscriber synchronization
-     * logic between Laravel models and Listmonk.
+     * Register the Subscribers API wrapper service.
      */
     protected function registerSubscribersService(): void
     {
         $this->app->singleton(Subscribers::class, function ($app) {
             return new Subscribers(
                 $app->make(PendingRequest::class)
+            );
+        });
+    }
+
+    /**
+     * Register the Lists API wrapper service.
+     */
+    protected function registerListsService(): void
+    {
+        $this->app->singleton(Lists::class, function ($app) {
+            return new Lists(
+                $app->make(PendingRequest::class)
+            );
+        });
+    }
+
+    /**
+     * Register the NewsletterManager service.
+     */
+    protected function registerNewsletterManager(): void
+    {
+        $this->app->singleton(NewsletterManager::class, function ($app) {
+            return new NewsletterManager(
+                $app->make(Subscribers::class)
             );
         });
     }
