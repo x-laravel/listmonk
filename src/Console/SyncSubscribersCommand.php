@@ -10,7 +10,8 @@ class SyncSubscribersCommand extends Command
     protected $signature = 'listmonk:sync 
                             {model? : The model class to sync (defaults to User model)}
                             {--chunk=100 : Number of records to process at once}
-                            {--force : Skip confirmation prompt}';
+                            {--force : Skip confirmation prompt}
+                            {--dry-run : Show what would be synced without making changes}';
 
     protected $description = 'Sync subscribers to Listmonk';
 
@@ -18,6 +19,7 @@ class SyncSubscribersCommand extends Command
     {
         $modelClass = $this->argument('model') ?: $this->getDefaultModel();
         $chunk = (int) $this->option('chunk');
+        $dryRun = $this->option('dry-run');
 
         if (!class_exists($modelClass)) {
             $this->components->error("Model class [{$modelClass}] does not exist.");
@@ -33,13 +35,18 @@ class SyncSubscribersCommand extends Command
 
         $this->components->info("Found {$total} records to sync.");
 
+        if ($dryRun) {
+            $this->components->warn('DRY RUN MODE - No changes will be made');
+            $this->newLine();
+        }
+
         if (!$this->option('force') && !$this->confirm('Do you want to continue?', true)) {
             $this->components->warn('Sync cancelled.');
             return self::SUCCESS;
         }
 
         $this->newLine();
-        $this->components->info('Starting sync...');
+        $this->components->info($dryRun ? 'Simulating sync...' : 'Starting sync...');
 
         $bar = $this->output->createProgressBar($total);
         $bar->start();
@@ -48,21 +55,28 @@ class SyncSubscribersCommand extends Command
         $failed = 0;
         $errors = [];
 
-        $modelClass::chunk($chunk, function ($models) use ($bar, &$synced, &$failed, &$errors) {
+        $modelClass::chunk($chunk, function ($models) use ($bar, &$synced, &$failed, &$errors, $dryRun) {
             foreach ($models as $model) {
-                try {
-                    $model->subscribeToNewsletter();
+                if ($dryRun) {
+                    // Dry run - just show what would happen
+                    $this->showDryRunInfo($model);
                     $synced++;
-                } catch (\Exception $e) {
-                    $failed++;
-                    $errors[] = [
-                        'model' => get_class($model),
-                        'id' => $model->id ?? 'unknown',
-                        'email' => method_exists($model, 'getNewsletterEmail')
-                            ? $model->getNewsletterEmail()
-                            : 'N/A',
-                        'error' => $e->getMessage()
-                    ];
+                } else {
+                    // Actual sync
+                    try {
+                        $model->subscribeToNewsletter();
+                        $synced++;
+                    } catch (\Exception $e) {
+                        $failed++;
+                        $errors[] = [
+                            'model' => get_class($model),
+                            'id' => $model->id ?? 'unknown',
+                            'email' => method_exists($model, 'getNewsletterEmail')
+                                ? $model->getNewsletterEmail()
+                                : 'N/A',
+                            'error' => $e->getMessage()
+                        ];
+                    }
                 }
 
                 $bar->advance();
@@ -73,9 +87,14 @@ class SyncSubscribersCommand extends Command
         $this->newLine(2);
 
         // Summary
-        $this->components->info("Sync completed!");
+        $this->components->info($dryRun ? "Dry run completed!" : "Sync completed!");
         $this->components->twoColumnDetail('Total', $total);
-        $this->components->twoColumnDetail('Synced', "<fg=green>{$synced}</>");
+
+        if ($dryRun) {
+            $this->components->twoColumnDetail('Would sync', "<fg=green>{$synced}</>");
+        } else {
+            $this->components->twoColumnDetail('Synced', "<fg=green>{$synced}</>");
+        }
 
         if ($failed > 0) {
             $this->components->twoColumnDetail('Failed', "<fg=red>{$failed}</>");
@@ -93,6 +112,22 @@ class SyncSubscribersCommand extends Command
         }
 
         return $failed > 0 ? self::FAILURE : self::SUCCESS;
+    }
+
+    protected function showDryRunInfo($model): void
+    {
+        // In verbose mode, show details
+        if ($this->output->isVerbose()) {
+            $email = method_exists($model, 'getNewsletterEmail')
+                ? $model->getNewsletterEmail()
+                : 'N/A';
+
+            $lists = method_exists($model, 'getNewsletterLists')
+                ? $model->getNewsletterLists()
+                : [];
+
+            $this->line("  → Would sync: {$email} to lists: " . implode(', ', $lists));
+        }
     }
 
     protected function getDefaultModel(): string

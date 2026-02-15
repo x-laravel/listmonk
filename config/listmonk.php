@@ -68,4 +68,17 @@ return [
     */
 
     'passive_list_id' => env('LISTMONK_PASSIVE_LIST_ID', null),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Email Change Behavior
+    |--------------------------------------------------------------------------
+    |
+    | When a user's email address changes, what should happen to the old email?
+    | - 'delete': Completely remove old email from Listmonk (default)
+    | - 'passive': Move old email to passive list (if configured)
+    |
+    */
+
+    'email_change_behavior' => env('LISTMONK_EMAIL_CHANGE_BEHAVIOR', 'delete'),
 ];

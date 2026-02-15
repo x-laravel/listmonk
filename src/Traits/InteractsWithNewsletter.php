@@ -52,11 +52,53 @@ trait InteractsWithNewsletter
         return $this->{$column} ?? '';
     }
 
+    /**
+     * Get custom attributes to sync with Listmonk.
+     *
+     * Override this method in your model to add custom fields:
+     *
+     * Example:
+     * public function getNewsletterAttributes(): array
+     * {
+     *     return [
+     *         'plan' => $this->subscription_plan ?? '',
+     *         'country' => $this->country ?? '',
+     *         'language' => $this->locale ?? 'en',
+     *         'registered_at' => $this->created_at?->toIso8601String(),
+     *     ];
+     * }
+     */
     public function getNewsletterAttributes(): array
     {
         return [];
     }
 
+    /**
+     * Get list IDs to subscribe to.
+     *
+     * Override this method in your model to customize lists:
+     *
+     * Example:
+     * public function getNewsletterLists(): array
+     * {
+     *     $lists = [];
+     *
+     *     // Main newsletter list
+     *     $lists[] = 1;
+     *
+     *     // Add premium list if user is premium
+     *     if ($this->is_premium) {
+     *         $lists[] = 2;
+     *     }
+     *
+     *     // Add language-specific list
+     *     if ($this->locale === 'tr') {
+     *         $lists[] = 3;
+     *     }
+     *
+     *     return $lists;
+     * }
+     */
     public function getNewsletterLists(): array
     {
         return config('listmonk.default_lists', []);

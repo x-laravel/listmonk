@@ -92,11 +92,26 @@ class NewsletterSubscriberObserver
             'new_email' => $newEmail
         ]);
 
-        // Unsubscribe old email
-        if (config('listmonk.queue.enabled')) {
-            \XLaravel\Listmonk\Jobs\UnsubscribeJobByEmail::dispatch($oldEmail);
+        $behavior = config('listmonk.email_change_behavior', 'delete');
+        $passiveListId = $model->getNewsletterPassiveListId();
+
+        // Handle old email based on configuration
+        if ($behavior === 'passive' && $passiveListId !== null) {
+            // Move old email to passive list
+            if (config('listmonk.queue.enabled')) {
+                \XLaravel\Listmonk\Jobs\MoveToPassiveListJobByEmail::dispatch($oldEmail, $passiveListId);
+            } else {
+                app(\XLaravel\Listmonk\Services\Subscribers::class)->moveToPassiveListByEmail($oldEmail, $passiveListId);
+            }
+            Log::debug('Old email will be moved to passive list', ['old_email' => $oldEmail]);
         } else {
-            app(\XLaravel\Listmonk\Services\Subscribers::class)->unsubscribeByEmail($oldEmail);
+            // Delete old email completely
+            if (config('listmonk.queue.enabled')) {
+                \XLaravel\Listmonk\Jobs\UnsubscribeJobByEmail::dispatch($oldEmail);
+            } else {
+                app(\XLaravel\Listmonk\Services\Subscribers::class)->unsubscribeByEmail($oldEmail);
+            }
+            Log::debug('Old email will be deleted', ['old_email' => $oldEmail]);
         }
 
         // Subscribe new email
