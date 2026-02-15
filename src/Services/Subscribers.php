@@ -82,6 +82,210 @@ class Subscribers
     }
 
     /**
+     * Update only email and name fields, preserving existing attributes and lists.
+     * This method fetches the current subscriber data and merges only email/name changes.
+     */
+    public function updatePartial(NewsletterSubscriber $model, array $fields = ['email', 'name']): void
+    {
+        try {
+            $email = $model->getNewsletterEmail();
+
+            // Validate email format
+            $this->validateEmail($email);
+
+            Log::debug('Starting partial Listmonk update', [
+                'email' => $email,
+                'fields' => $fields,
+                'model' => get_class($model)
+            ]);
+
+            // Fetch current subscriber data
+            $remote = $this->fetchRemoteByEmail($email);
+
+            if (!$remote) {
+                // Subscriber doesn't exist - do full sync instead
+                Log::warning('Subscriber not found for partial update, doing full sync', [
+                    'email' => $email
+                ]);
+                $this->sync($model);
+                return;
+            }
+
+            // Prepare payload with only changed fields
+            $nameColumn = $model->getNewsletterNameColumn();
+
+            $payload = [
+                'email' => in_array('email', $fields) ? $model->getNewsletterEmail() : $remote['email'],
+                'name' => in_array('name', $fields) ? ($model->{$nameColumn} ?? '') : $remote['name'],
+                'status' => $remote['status'] ?? 'enabled',
+                'lists' => $this->extractListIds($remote), // Keep existing lists
+                'attribs' => $remote['attribs'] ?? [], // Keep existing attributes
+                'preconfirm_subscriptions' => config('listmonk.preconfirm_subscriptions', true),
+            ];
+
+            $response = $this->client->put("/api/subscribers/{$remote['id']}", $payload);
+
+            if ($response->failed()) {
+                throw new ListmonkApiException(
+                    "Failed to partially update subscriber: " . $response->body(),
+                    $response->status()
+                );
+            }
+
+            Log::debug('Subscriber partially updated in Listmonk', [
+                'email' => $email,
+                'listmonk_id' => $remote['id'],
+                'updated_fields' => $fields
+            ]);
+
+            event(new SubscriberSynced($model, $response->json()));
+
+        } catch (ListmonkApiException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('Partial update failed', [
+                'email' => $model->getNewsletterEmail(),
+                'error' => $e->getMessage()
+            ]);
+
+            event(new SubscriberSyncFailed($model, $e));
+
+            throw new ListmonkApiException(
+                "Unexpected error during partial update: " . $e->getMessage(),
+                0,
+                $e
+            );
+        }
+    }
+
+    /**
+     * Move subscriber to passive list (for deleted/inactive users).
+     * Unsubscribes from all active lists and subscribes only to passive list.
+     */
+    public function moveToPassiveList(NewsletterSubscriber $model, int $passiveListId): void
+    {
+        $email = $model->getNewsletterEmail();
+        $this->moveToPassiveListByEmail($email, $passiveListId);
+    }
+
+    /**
+     * Move subscriber to passive list by email address.
+     */
+    public function moveToPassiveListByEmail(string $email, int $passiveListId): void
+    {
+        try {
+            // Validate email format
+            $this->validateEmail($email);
+
+            Log::debug('Moving subscriber to passive list', [
+                'email' => $email,
+                'passive_list_id' => $passiveListId
+            ]);
+
+            $remote = $this->fetchRemoteByEmail($email);
+
+            if (!$remote) {
+                Log::debug('Subscriber not found for passive list move (already removed)', [
+                    'email' => $email
+                ]);
+                return;
+            }
+
+            // Update subscriber with only passive list
+            $payload = [
+                'email' => $remote['email'],
+                'name' => $remote['name'],
+                'status' => 'enabled',
+                'lists' => [$passiveListId], // Only passive list
+                'attribs' => $remote['attribs'] ?? [],
+                'preconfirm_subscriptions' => config('listmonk.preconfirm_subscriptions', true),
+            ];
+
+            $response = $this->client->put("/api/subscribers/{$remote['id']}", $payload);
+
+            if ($response->failed()) {
+                throw new ListmonkApiException(
+                    "Failed to move subscriber to passive list: " . $response->body(),
+                    $response->status()
+                );
+            }
+
+            Log::info('Subscriber moved to passive list', [
+                'email' => $email,
+                'listmonk_id' => $remote['id'],
+                'passive_list_id' => $passiveListId
+            ]);
+
+        } catch (ListmonkApiException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('Move to passive list failed', [
+                'email' => $email,
+                'error' => $e->getMessage()
+            ]);
+
+            throw new ListmonkApiException(
+                "Unexpected error moving to passive list: " . $e->getMessage(),
+                0,
+                $e
+            );
+        }
+    }
+
+    /**
+     * Unsubscribe a subscriber by email address.
+     * Deletes the subscriber from Listmonk completely.
+     */
+    public function unsubscribeByEmail(string $email): void
+    {
+        try {
+            // Validate email format
+            $this->validateEmail($email);
+
+            Log::debug('Attempting to delete subscriber from Listmonk', [
+                'email' => $email
+            ]);
+
+            $remote = $this->fetchRemoteByEmail($email);
+
+            if (!$remote) {
+                Log::debug('Subscriber not found in Listmonk for deletion (already deleted or never subscribed)', [
+                    'email' => $email
+                ]);
+                return;
+            }
+
+            // Delete subscriber completely
+            $response = $this->client->delete("/api/subscribers/{$remote['id']}");
+
+            if ($response->failed()) {
+                throw new ListmonkApiException(
+                    "Failed to delete subscriber: " . $response->body(),
+                    $response->status()
+                );
+            }
+
+            Log::info('Subscriber deleted from Listmonk', [
+                'email' => $email,
+                'listmonk_id' => $remote['id']
+            ]);
+
+        } catch (ListmonkApiException $e) {
+            Log::error('Listmonk deletion failed', [
+                'email' => $email,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('Unexpected error during deletion', [
+                'email' => $email,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
      * Sync multiple subscribers in batch.
      */
     public function syncMany(iterable $models): array
@@ -113,63 +317,12 @@ class Subscribers
 
     /**
      * Unsubscribe a subscriber from all lists.
-     * Silently succeeds if subscriber doesn't exist (idempotent).
+     * Deletes the subscriber from Listmonk completely.
      */
     public function unsubscribe(NewsletterSubscriber $model): void
     {
-        try {
-            $email = $model->getNewsletterEmail();
-
-            // Validate email format
-            $this->validateEmail($email);
-
-            Log::debug('Attempting to unsubscribe from Listmonk', [
-                'email' => $email,
-                'model' => get_class($model)
-            ]);
-
-            $remote = $this->fetchRemoteByEmail($email);
-
-            if (!$remote) {
-                // Subscriber doesn't exist in Listmonk - this is OK, just log and return
-                Log::debug('Subscriber not found in Listmonk for unsubscribe (already unsubscribed or never subscribed)', [
-                    'email' => $email
-                ]);
-                return;
-            }
-
-            // Set status to disabled
-            $response = $this->client->put("/api/subscribers/{$remote['id']}", [
-                'status' => 'disabled'
-            ]);
-
-            if ($response->failed()) {
-                throw new ListmonkApiException(
-                    "Failed to unsubscribe subscriber: " . $response->body(),
-                    $response->status()
-                );
-            }
-
-            Log::info('Subscriber unsubscribed from Listmonk', [
-                'email' => $email,
-                'listmonk_id' => $remote['id']
-            ]);
-
-            event(new SubscriberUnsubscribed($model));
-
-        } catch (ListmonkApiException $e) {
-            Log::error('Listmonk unsubscribe failed', [
-                'email' => $model->getNewsletterEmail(),
-                'error' => $e->getMessage()
-            ]);
-            throw $e;
-        } catch (\Exception $e) {
-            Log::error('Unexpected error during unsubscribe', [
-                'email' => $model->getNewsletterEmail(),
-                'error' => $e->getMessage()
-            ]);
-            throw $e;
-        }
+        $email = $model->getNewsletterEmail();
+        $this->unsubscribeByEmail($email);
     }
 
     /*
@@ -185,7 +338,7 @@ class Subscribers
      * @throws ListmonkApiException
      * @throws ListmonkConnectionException
      */
-    protected function fetchRemoteByEmail(string $email): ?array
+    public function fetchRemoteByEmail(string $email): ?array
     {
         try {
             // Escape single quotes to prevent SQL injection
@@ -241,9 +394,11 @@ class Subscribers
     protected function createRemote(NewsletterSubscriber $model): array
     {
         try {
+            $nameColumn = $model->getNewsletterNameColumn();
+
             $payload = [
                 'email' => $model->getNewsletterEmail(),
-                'name' => $model->getNewsletterName(),
+                'name' => $model->{$nameColumn} ?? '',
                 'status' => 'enabled',
                 'lists' => $model->getNewsletterLists(),
                 'attribs' => $model->getNewsletterAttributes(),
@@ -296,9 +451,11 @@ class Subscribers
             // Merge lists: keep existing + add new ones
             $mergedLists = $this->mergeLists($existingLists, $newLists);
 
+            $nameColumn = $model->getNewsletterNameColumn();
+
             $payload = [
                 'email' => $model->getNewsletterEmail(),
-                'name' => $model->getNewsletterName(),
+                'name' => $model->{$nameColumn} ?? '',
                 'status' => 'enabled',
                 'lists' => $mergedLists,
                 'attribs' => $model->getNewsletterAttributes(),

@@ -6,6 +6,7 @@ use Illuminate\Contracts\Support\DeferrableProvider;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use XLaravel\Listmonk\Services\Subscribers;
 
 class ListmonkServiceProvider extends ServiceProvider implements DeferrableProvider
@@ -33,6 +34,7 @@ class ListmonkServiceProvider extends ServiceProvider implements DeferrableProvi
     {
         $this->registerPublishing();
         $this->registerCommands();
+        $this->registerObserver();
 
         // Validation sadece console'da değilse çalışsın
         // Console'da zaten command ilk çalıştığında hata verecek
@@ -161,6 +163,36 @@ class ListmonkServiceProvider extends ServiceProvider implements DeferrableProvi
                 \XLaravel\Listmonk\Console\ListmonkHealthCommand::class,
                 \XLaravel\Listmonk\Console\SyncSubscribersCommand::class,
             ]);
+        }
+    }
+
+    /**
+     * Register the NewsletterSubscriber observer.
+     *
+     * This observer watches all models that use the InteractsWithNewsletter trait
+     * and automatically syncs them with Listmonk on lifecycle events.
+     */
+    protected function registerObserver(): void
+    {
+        // Get all loaded classes
+        $declaredClasses = get_declared_classes();
+
+        foreach ($declaredClasses as $class) {
+            // Skip non-model classes
+            if (!is_subclass_of($class, \Illuminate\Database\Eloquent\Model::class)) {
+                continue;
+            }
+
+            // Check if model uses InteractsWithNewsletter trait
+            $traits = class_uses_recursive($class);
+
+            if (in_array(\XLaravel\Listmonk\Traits\InteractsWithNewsletter::class, $traits)) {
+                $class::observe(\XLaravel\Listmonk\Observers\NewsletterSubscriberObserver::class);
+
+                Log::debug('Registered NewsletterSubscriberObserver for model', [
+                    'model' => $class
+                ]);
+            }
         }
     }
 

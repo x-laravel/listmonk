@@ -55,4 +55,17 @@ return [
     */
 
     'default_lists' => [],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Passive List
+    |--------------------------------------------------------------------------
+    |
+    | When a subscriber is deleted or soft-deleted, they can be moved to a
+    | "passive" list instead of being unsubscribed. Set to null to unsubscribe.
+    | Can be overridden per-model by implementing getNewsletterPassiveListId().
+    |
+    */
+
+    'passive_list_id' => env('LISTMONK_PASSIVE_LIST_ID', null),
 ];
