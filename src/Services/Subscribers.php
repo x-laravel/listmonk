@@ -21,7 +21,7 @@ class Subscribers
 
     /*
     |--------------------------------------------------------------------------
-    | MAIN SYNC METHOD
+    | PUBLIC API
     |--------------------------------------------------------------------------
     */
 
@@ -34,25 +34,17 @@ class Subscribers
     {
         try {
             $email = $model->getNewsletterEmail();
-
-            // Validate email format
             $this->validateEmail($email);
 
-            // Fetch subscriber from Listmonk by email
             $remote = $this->fetchRemoteByEmail($email);
 
             if ($remote) {
-                // Subscriber exists - update it
                 $response = $this->updateRemote($remote, $model);
-
                 event(new SubscriberSynced($model, $response));
             } else {
-                // Subscriber doesn't exist - create it
                 $response = $this->createRemote($model);
-
                 event(new SubscriberSubscribed($model, $response));
             }
-
         } catch (\Exception $e) {
             Log::error('Listmonk sync failed', [
                 'email' => $model->getNewsletterEmail(),
@@ -68,75 +60,41 @@ class Subscribers
     }
 
     /**
-     * Update only email and name fields, preserving existing attributes and lists.
-     * This method fetches the current subscriber data and merges only email/name changes.
+     * Update only specified fields, preserving existing attributes and lists.
      */
     public function updatePartial(NewsletterSubscriber $model, array $fields = ['email', 'name']): void
     {
-        try {
-            $email = $model->getNewsletterEmail();
+        $email = $model->getNewsletterEmail();
+        $this->validateEmail($email);
 
-            // Validate email format
-            $this->validateEmail($email);
+        $remote = $this->fetchRemoteByEmail($email);
 
-            // Fetch current subscriber data
-            $remote = $this->fetchRemoteByEmail($email);
-
-            if (!$remote) {
-                // Subscriber doesn't exist - do full sync instead
-                $this->sync($model);
-                return;
-            }
-
-            // Prepare payload with only changed fields
-            $nameColumn = $model->getNewsletterNameColumn();
-
-            $payload = [
-                'email' => in_array('email', $fields) ? $model->getNewsletterEmail() : $remote['email'],
-                'name' => in_array('name', $fields) ? ($model->{$nameColumn} ?? '') : $remote['name'],
-                'status' => $remote['status'] ?? 'enabled',
-                'lists' => $this->extractListIds($remote), // Keep existing lists
-                'attribs' => $remote['attribs'] ?? [], // Keep existing attributes
-                'preconfirm_subscriptions' => config('listmonk.preconfirm_subscriptions', true),
-            ];
-
-            $response = $this->client->put("/api/subscribers/{$remote['id']}", $payload);
-
-            if ($response->failed()) {
-                throw new ListmonkApiException(
-                    "Failed to partially update subscriber: " . $response->body(),
-                    $response->status()
-                );
-            }
-
-            event(new SubscriberSynced($model, $response->json()));
-
-        } catch (ListmonkApiException $e) {
-            throw $e;
-        } catch (\Exception $e) {
-            Log::error('Partial update failed', [
-                'email' => $model->getNewsletterEmail(),
-                'error' => $e->getMessage()
-            ]);
-
-            event(new SubscriberSyncFailed($model, $e));
-
-            throw new ListmonkApiException(
-                "Unexpected error during partial update: " . $e->getMessage(),
-                0,
-                $e
-            );
+        if (!$remote) {
+            $this->sync($model);
+            return;
         }
+
+        $nameColumn = $model->getNewsletterNameColumn();
+
+        $payload = $this->buildPayload(
+            email: in_array('email', $fields) ? $model->getNewsletterEmail() : $remote['email'],
+            name: in_array('name', $fields) ? ($model->{$nameColumn} ?? '') : $remote['name'],
+            lists: $this->extractListIds($remote),
+            attribs: $remote['attribs'] ?? [],
+            status: $remote['status'] ?? 'enabled',
+        );
+
+        $this->putSubscriber($remote['id'], $payload, 'partially update');
+
+        event(new SubscriberSynced($model, $payload));
     }
 
     /**
      * Move subscriber to passive list (for deleted/inactive users).
-     * Unsubscribes from all active lists and subscribes only to passive list.
      */
     public function moveToPassiveList(NewsletterSubscriber $model, int $passiveListId): void
     {
-        $email = $model->getNewsletterEmail();
-        $this->moveToPassiveListByEmail($email, $passiveListId);
+        $this->moveToPassiveListByEmail($model->getNewsletterEmail(), $passiveListId);
     }
 
     /**
@@ -144,49 +102,22 @@ class Subscribers
      */
     public function moveToPassiveListByEmail(string $email, int $passiveListId): void
     {
-        try {
-            // Validate email format
-            $this->validateEmail($email);
+        $this->validateEmail($email);
 
-            $remote = $this->fetchRemoteByEmail($email);
+        $remote = $this->fetchRemoteByEmail($email);
 
-            if (!$remote) {
-                return;
-            }
-
-            // Update subscriber with only passive list
-            $payload = [
-                'email' => $remote['email'],
-                'name' => $remote['name'],
-                'status' => 'enabled',
-                'lists' => [$passiveListId], // Only passive list
-                'attribs' => $remote['attribs'] ?? [],
-                'preconfirm_subscriptions' => config('listmonk.preconfirm_subscriptions', true),
-            ];
-
-            $response = $this->client->put("/api/subscribers/{$remote['id']}", $payload);
-
-            if ($response->failed()) {
-                throw new ListmonkApiException(
-                    "Failed to move subscriber to passive list: " . $response->body(),
-                    $response->status()
-                );
-            }
-
-        } catch (ListmonkApiException $e) {
-            throw $e;
-        } catch (\Exception $e) {
-            Log::error('Move to passive list failed', [
-                'email' => $email,
-                'error' => $e->getMessage()
-            ]);
-
-            throw new ListmonkApiException(
-                "Unexpected error moving to passive list: " . $e->getMessage(),
-                0,
-                $e
-            );
+        if (!$remote) {
+            return;
         }
+
+        $payload = $this->buildPayload(
+            email: $remote['email'],
+            name: $remote['name'],
+            lists: [$passiveListId],
+            attribs: $remote['attribs'] ?? [],
+        );
+
+        $this->putSubscriber($remote['id'], $payload, 'move to passive list');
     }
 
     /**
@@ -195,42 +126,18 @@ class Subscribers
      */
     public function unsubscribeByEmail(string $email): void
     {
-        try {
-            // Validate email format
-            $this->validateEmail($email);
+        $this->validateEmail($email);
 
-            $remote = $this->fetchRemoteByEmail($email);
+        $remote = $this->fetchRemoteByEmail($email);
 
-            if (!$remote) {
-                return;
-            }
-
-            // Delete subscriber completely
-            $response = $this->client->delete("/api/subscribers/{$remote['id']}");
-
-            if ($response->failed()) {
-                throw new ListmonkApiException(
-                    "Failed to delete subscriber: " . $response->body(),
-                    $response->status()
-                );
-            }
-
-            // Note: We can't fire SubscriberUnsubscribed event here because we don't have the model
-            // Event is only fired when unsubscribe() is called with a model
-
-        } catch (ListmonkApiException $e) {
-            Log::error('Listmonk deletion failed', [
-                'email' => $email,
-                'error' => $e->getMessage()
-            ]);
-            throw $e;
-        } catch (\Exception $e) {
-            Log::error('Unexpected error during deletion', [
-                'email' => $email,
-                'error' => $e->getMessage()
-            ]);
-            throw $e;
+        if (!$remote) {
+            return;
         }
+
+        $response = $this->apiCall(
+            fn () => $this->client->delete("/api/subscribers/{$remote['id']}"),
+            'delete'
+        );
     }
 
     /**
@@ -238,11 +145,7 @@ class Subscribers
      */
     public function syncMany(iterable $models): array
     {
-        $results = [
-            'synced' => 0,
-            'failed' => 0,
-            'errors' => []
-        ];
+        $results = ['synced' => 0, 'failed' => 0, 'errors' => []];
 
         foreach ($models as $model) {
             try {
@@ -267,10 +170,8 @@ class Subscribers
      */
     public function unsubscribe(NewsletterSubscriber $model): void
     {
-        $email = $model->getNewsletterEmail();
-        $this->unsubscribeByEmail($email);
+        $this->unsubscribeByEmail($model->getNewsletterEmail());
 
-        // Fire event
         event(new SubscriberUnsubscribed($model));
     }
 
@@ -289,206 +190,146 @@ class Subscribers
      */
     public function fetchRemoteByEmail(string $email): ?array
     {
-        try {
-            // Escape single quotes to prevent SQL injection
-            $escapedEmail = str_replace("'", "''", $email);
+        $escapedEmail = str_replace("'", "''", $email);
 
-            $response = $this->client->get('/api/subscribers', [
+        $response = $this->apiCall(
+            fn () => $this->client->get('/api/subscribers', [
                 'query' => "subscribers.email = '{$escapedEmail}'"
-            ]);
+            ]),
+            'fetch'
+        );
 
-            if ($response->failed()) {
-                throw new ListmonkApiException(
-                    "Failed to fetch subscriber [{$email}]: " . $response->body(),
-                    $response->status()
-                );
-            }
+        $results = $response->json('data.results', []);
 
-            $results = $response->json('data.results', []);
-
-            return !empty($results) ? $results[0] : null;
-
-        } catch (ListmonkApiException $e) {
-            throw $e;
-        } catch (\Illuminate\Http\Client\ConnectionException $e) {
-            // Check if it's a timeout
-            if (str_contains($e->getMessage(), 'timed out') || str_contains($e->getMessage(), 'timeout')) {
-                throw new ListmonkConnectionException(
-                    "Request timed out while connecting to Listmonk API. Please check network connectivity or increase timeout.",
-                    0,
-                    $e
-                );
-            }
-
-            throw new ListmonkConnectionException(
-                "Cannot connect to Listmonk API: " . $e->getMessage(),
-                0,
-                $e
-            );
-        } catch (\Exception $e) {
-            throw new ListmonkApiException(
-                "Unexpected error fetching subscriber: " . $e->getMessage(),
-                0,
-                $e
-            );
-        }
-    }
-
-    /**
-     * Create a new subscriber in Listmonk.
-     *
-     * @return array API response
-     * @throws ListmonkApiException
-     */
-    protected function createRemote(NewsletterSubscriber $model): array
-    {
-        try {
-            $nameColumn = $model->getNewsletterNameColumn();
-
-            $payload = [
-                'email' => $model->getNewsletterEmail(),
-                'name' => $model->{$nameColumn} ?? '',
-                'status' => 'enabled',
-                'lists' => $model->getNewsletterLists(),
-                'attribs' => $model->getNewsletterAttributes(),
-                'preconfirm_subscriptions' => config('listmonk.preconfirm_subscriptions', true),
-            ];
-
-            $response = $this->client->post('/api/subscribers', $payload);
-
-            if ($response->failed()) {
-                throw new ListmonkApiException(
-                    "Failed to create subscriber: " . $response->body(),
-                    $response->status()
-                );
-            }
-
-            return $response->json();
-
-        } catch (ListmonkApiException $e) {
-            throw $e;
-        } catch (\Illuminate\Http\Client\ConnectionException $e) {
-            throw new ListmonkConnectionException(
-                "Connection error while creating subscriber: " . $e->getMessage(),
-                0,
-                $e
-            );
-        } catch (\Exception $e) {
-            throw new ListmonkApiException(
-                "Unexpected error creating subscriber: " . $e->getMessage(),
-                0,
-                $e
-            );
-        }
-    }
-
-    /**
-     * Update an existing subscriber in Listmonk.
-     * - Updates name and attributes
-     * - Merges new lists with existing lists (doesn't overwrite)
-     *
-     * @return array API response
-     * @throws ListmonkApiException
-     */
-    protected function updateRemote(array $remote, NewsletterSubscriber $model): array
-    {
-        try {
-            $remoteId = $remote['id'];
-            $existingLists = $this->extractListIds($remote);
-            $newLists = $model->getNewsletterLists();
-
-            // Merge lists: keep existing + add new ones
-            $mergedLists = $this->mergeLists($existingLists, $newLists);
-
-            $nameColumn = $model->getNewsletterNameColumn();
-
-            $payload = [
-                'email' => $model->getNewsletterEmail(),
-                'name' => $model->{$nameColumn} ?? '',
-                'status' => 'enabled',
-                'lists' => $mergedLists,
-                'attribs' => $model->getNewsletterAttributes(),
-                'preconfirm_subscriptions' => config('listmonk.preconfirm_subscriptions', true),
-            ];
-
-            $response = $this->client->put("/api/subscribers/{$remoteId}", $payload);
-
-            if ($response->failed()) {
-                throw new ListmonkApiException(
-                    "Failed to update subscriber: " . $response->body(),
-                    $response->status()
-                );
-            }
-
-            return $response->json();
-
-        } catch (ListmonkApiException $e) {
-            throw $e;
-        } catch (\Illuminate\Http\Client\ConnectionException $e) {
-            throw new ListmonkConnectionException(
-                "Connection error while updating subscriber: " . $e->getMessage(),
-                0,
-                $e
-            );
-        } catch (\Exception $e) {
-            throw new ListmonkApiException(
-                "Unexpected error updating subscriber: " . $e->getMessage(),
-                0,
-                $e
-            );
-        }
+        return !empty($results) ? $results[0] : null;
     }
 
     /*
     |--------------------------------------------------------------------------
-    | HELPER METHODS
+    | INTERNAL METHODS
     |--------------------------------------------------------------------------
     */
 
-    /**
-     * Validate email address format.
-     *
-     * @throws \InvalidArgumentException
-     */
-    protected function validateEmail(string $email): void
+    protected function createRemote(NewsletterSubscriber $model): array
     {
-        if (empty($email)) {
-            throw new \InvalidArgumentException('Email address cannot be empty.');
-        }
+        $nameColumn = $model->getNewsletterNameColumn();
 
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            throw new \InvalidArgumentException("Invalid email address format: {$email}");
-        }
+        $payload = $this->buildPayload(
+            email: $model->getNewsletterEmail(),
+            name: $model->{$nameColumn} ?? '',
+            lists: $model->getNewsletterLists(),
+            attribs: $model->getNewsletterAttributes(),
+        );
 
-        // Additional check: no spaces allowed
-        if (str_contains($email, ' ')) {
-            throw new \InvalidArgumentException("Email address cannot contain spaces: {$email}");
+        return $this->apiCall(
+            fn () => $this->client->post('/api/subscribers', $payload),
+            'create'
+        )->json();
+    }
+
+    protected function updateRemote(array $remote, NewsletterSubscriber $model): array
+    {
+        $nameColumn = $model->getNewsletterNameColumn();
+        $mergedLists = $this->mergeLists($this->extractListIds($remote), $model->getNewsletterLists());
+
+        $payload = $this->buildPayload(
+            email: $model->getNewsletterEmail(),
+            name: $model->{$nameColumn} ?? '',
+            lists: $mergedLists,
+            attribs: $model->getNewsletterAttributes(),
+        );
+
+        return $this->apiCall(
+            fn () => $this->client->put("/api/subscribers/{$remote['id']}", $payload),
+            'update'
+        )->json();
+    }
+
+    /**
+     * Update an existing subscriber via PUT.
+     */
+    protected function putSubscriber(int $id, array $payload, string $operation): void
+    {
+        $this->apiCall(
+            fn () => $this->client->put("/api/subscribers/{$id}", $payload),
+            $operation
+        );
+    }
+
+    /**
+     * Execute an API call with unified error handling.
+     *
+     * @throws ListmonkApiException
+     * @throws ListmonkConnectionException
+     */
+    protected function apiCall(\Closure $request, string $operation): \Illuminate\Http\Client\Response
+    {
+        try {
+            $response = $request();
+
+            if ($response->failed()) {
+                throw new ListmonkApiException(
+                    "Failed to {$operation} subscriber: " . $response->body(),
+                    $response->status()
+                );
+            }
+
+            return $response;
+        } catch (ListmonkApiException $e) {
+            throw $e;
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            $message = str_contains($e->getMessage(), 'timed out') || str_contains($e->getMessage(), 'timeout')
+                ? "Request timed out while connecting to Listmonk API. Please check network connectivity or increase timeout."
+                : "Cannot connect to Listmonk API: " . $e->getMessage();
+
+            throw new ListmonkConnectionException($message, 0, $e);
+        } catch (\Exception $e) {
+            throw new ListmonkApiException(
+                "Unexpected error during {$operation}: " . $e->getMessage(),
+                0,
+                $e
+            );
         }
     }
 
     /**
-     * Extract list IDs from a remote subscriber response.
+     * Build a subscriber payload for Listmonk API.
      */
+    protected function buildPayload(
+        string $email,
+        string $name,
+        array $lists,
+        array $attribs,
+        string $status = 'enabled',
+    ): array {
+        return [
+            'email' => $email,
+            'name' => $name,
+            'status' => $status,
+            'lists' => $lists,
+            'attribs' => $attribs,
+            'preconfirm_subscriptions' => config('listmonk.preconfirm_subscriptions', true),
+        ];
+    }
+
+    protected function validateEmail(string $email): void
+    {
+        if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new \InvalidArgumentException("Invalid email address: {$email}");
+        }
+    }
+
     protected function extractListIds(array $remote): array
     {
-        $lists = Arr::get($remote, 'lists', []);
-
-        return collect($lists)
+        return collect(Arr::get($remote, 'lists', []))
             ->pluck('id')
             ->filter()
             ->values()
             ->toArray();
     }
 
-    /**
-     * Merge existing lists with new lists (union operation).
-     * Removes duplicates and returns a clean array.
-     */
     protected function mergeLists(array $existing, array $new): array
     {
-        return array_values(array_unique([
-            ...$existing,
-            ...$new,
-        ]));
+        return array_values(array_unique([...$existing, ...$new]));
     }
 }
