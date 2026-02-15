@@ -13,7 +13,7 @@ Provides a clean API wrapper for Listmonk's REST API, automatic model-to-subscri
 ## Installation
 
 ```bash
-composer require xlaravel/listmonk
+composer require x-laravel/listmonk
 ```
 
 Publish the configuration file:
