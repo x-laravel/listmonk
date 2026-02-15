@@ -27,15 +27,16 @@ class NewsletterManager
             $email = $model->getNewsletterEmail();
             $this->validateEmail($email);
 
+            $nameColumn = $model->getNewsletterNameColumn();
+            $name = $model->{$nameColumn} ?? '';
             $remote = $this->findByEmail($email);
 
             if ($remote) {
-                $nameColumn = $model->getNewsletterNameColumn();
                 $mergedLists = $this->mergeLists($this->extractListIds($remote), $model->getNewsletterLists());
 
                 $payload = $this->buildPayload(
-                    email: $model->getNewsletterEmail(),
-                    name: $model->{$nameColumn} ?? '',
+                    email: $email,
+                    name: $name,
                     lists: $mergedLists,
                     attribs: $model->getNewsletterAttributes(),
                 );
@@ -43,11 +44,9 @@ class NewsletterManager
                 $response = $this->subscribers->update($remote['id'], $payload);
                 event(new SubscriberSynced($model, $response));
             } else {
-                $nameColumn = $model->getNewsletterNameColumn();
-
                 $payload = $this->buildPayload(
-                    email: $model->getNewsletterEmail(),
-                    name: $model->{$nameColumn} ?? '',
+                    email: $email,
+                    name: $name,
                     lists: $model->getNewsletterLists(),
                     attribs: $model->getNewsletterAttributes(),
                 );
@@ -94,9 +93,9 @@ class NewsletterManager
             status: $remote['status'] ?? 'enabled',
         );
 
-        $this->subscribers->update($remote['id'], $payload);
+        $response = $this->subscribers->update($remote['id'], $payload);
 
-        event(new SubscriberSynced($model, $payload));
+        event(new SubscriberSynced($model, $response));
     }
 
     /**

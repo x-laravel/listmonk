@@ -110,8 +110,8 @@ class NewsletterSubscriberObserver
             // Soft delete - move to passive list
             $model->moveToPassiveList();
         } else {
-            // Force delete - unsubscribe
-            $model->moveToPassiveList();
+            // Force delete - unsubscribe completely
+            $model->unsubscribeFromNewsletter();
         }
     }
 
