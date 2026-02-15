@@ -9,6 +9,7 @@ use XLaravel\Listmonk\Events\SubscriberSubscribed;
 use XLaravel\Listmonk\Events\SubscriberSynced;
 use XLaravel\Listmonk\Events\SubscriberSyncFailed;
 use XLaravel\Listmonk\Events\SubscriberUnsubscribed;
+use XLaravel\Listmonk\Exceptions\ListmonkApiException;
 
 class NewsletterManager
 {
@@ -51,8 +52,28 @@ class NewsletterManager
                     attribs: $model->getNewsletterAttributes(),
                 );
 
-                $response = $this->subscribers->create($payload);
-                event(new SubscriberSubscribed($model, $response));
+                try {
+                    $response = $this->subscribers->create($payload);
+                    event(new SubscriberSubscribed($model, $response));
+                } catch (ListmonkApiException $e) {
+                    // Race condition: another process created the same subscriber
+                    // between our findByEmail and create calls. Retry as update.
+                    if ($e->getCode() === 409) {
+                        $remote = $this->findByEmail($email);
+
+                        if ($remote) {
+                            $payload['lists'] = $this->mergeLists(
+                                $this->extractListIds($remote),
+                                $model->getNewsletterLists()
+                            );
+                            $response = $this->subscribers->update($remote['id'], $payload);
+                            event(new SubscriberSynced($model, $response));
+                            return;
+                        }
+                    }
+
+                    throw $e;
+                }
             }
         } catch (\Exception $e) {
             Log::error('Listmonk sync failed', [
