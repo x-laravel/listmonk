@@ -105,26 +105,32 @@ class NewsletterManager
      */
     public function unsubscribe(NewsletterSubscriber $model): void
     {
-        $this->unsubscribeByEmail($model->getNewsletterEmail());
+        $deleted = $this->unsubscribeByEmail($model->getNewsletterEmail());
 
-        event(new SubscriberUnsubscribed($model));
+        if ($deleted) {
+            event(new SubscriberUnsubscribed($model));
+        }
     }
 
     /**
      * Unsubscribe a subscriber by email address.
      * Deletes the subscriber from Listmonk completely.
+     *
+     * @return bool Whether a subscriber was found and deleted.
      */
-    public function unsubscribeByEmail(string $email): void
+    public function unsubscribeByEmail(string $email): bool
     {
         $this->validateEmail($email);
 
         $remote = $this->findByEmail($email);
 
         if (!$remote) {
-            return;
+            return false;
         }
 
         $this->subscribers->delete($remote['id']);
+
+        return true;
     }
 
     /**

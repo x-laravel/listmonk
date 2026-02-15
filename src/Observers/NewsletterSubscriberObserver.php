@@ -70,7 +70,6 @@ class NewsletterSubscriberObserver
     protected function handleEmailChange(NewsletterSubscriber $model, string $emailColumn): void
     {
         $oldEmail = $model->getOriginal($emailColumn);
-        $newEmail = $model->{$emailColumn};
 
         $behavior = config('listmonk.email_change_behavior', 'delete');
         $passiveListId = $model->getNewsletterPassiveListId();

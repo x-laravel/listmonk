@@ -21,6 +21,15 @@ trait InteractsWithListmonk
                 ]
             ], 200),
 
+            '*/api/lists*' => Http::response([
+                'data' => [
+                    'results' => [],
+                    'total' => 0,
+                    'per_page' => 20,
+                    'page' => 1
+                ]
+            ], 200),
+
             '*/api/health' => Http::response(['status' => 'ok'], 200),
         ]);
     }
