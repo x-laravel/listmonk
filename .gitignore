@@ -1,9 +1,6 @@
-# Ignore IDE and editor specific files
 /.idea
-/.fleet
-/.nova
-/.vscode
-/.zed
-
-# Ignore environment files
 /vendor
+/.phpunit.cache
+/phpunit.xml
+/phpstan.neon
+composer.lock

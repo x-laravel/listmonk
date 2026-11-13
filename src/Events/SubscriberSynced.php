@@ -2,17 +2,13 @@
 
 namespace XLaravel\Listmonk\Events;
 
-use Illuminate\Foundation\Events\Dispatchable;
-use Illuminate\Queue\SerializesModels;
-use XLaravel\Listmonk\Contracts\NewsletterSubscriber;
+use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
+use XLaravel\Listmonk\Models\Subscriber;
 
-class SubscriberSynced
+final readonly class SubscriberSynced implements ShouldDispatchAfterCommit
 {
-    use Dispatchable, SerializesModels;
-
     public function __construct(
-        public NewsletterSubscriber $model,
-        public array $response
+        public Subscriber $subscriber,
     ) {
     }
 }

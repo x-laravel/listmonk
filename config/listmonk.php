@@ -1,84 +1,110 @@
 <?php
 
+use XLaravel\Listmonk\Models\Subscriber;
+
 return [
+
     /*
     |--------------------------------------------------------------------------
-    | Listmonk API Configuration
+    | API
     |--------------------------------------------------------------------------
     |
-    | Base URL and credentials for your Listmonk instance.
+    | enabled   Sync models with Listmonk. Nothing is sent while this is
+    |           false, or while the url or the token is empty.
+    | url       Address of the Listmonk instance.
+    | username  Name of the Listmonk API user.
+    | token     Token of the Listmonk API user.
+    | timeout   Seconds to wait for a response.
     |
     */
 
-    'base_url' => env('LISTMONK_BASE_URL', 'http://localhost:9000'),
-    'api_user' => env('LISTMONK_API_USER'),
-    'api_token' => env('LISTMONK_API_TOKEN'),
+    'enabled' => env('LISTMONK_ENABLED', true),
+
+    'url' => env('LISTMONK_API_URL'),
+
+    'username' => env('LISTMONK_API_USERNAME'),
+
+    'token' => env('LISTMONK_API_TOKEN'),
+
+    'timeout' => 10,
 
     /*
     |--------------------------------------------------------------------------
-    | Subscription Settings
+    | Subscriptions
     |--------------------------------------------------------------------------
     |
-    | preconfirm_subscriptions: Automatically confirm new subscriptions without
-    | requiring email confirmation. Set to false for public signup forms.
+    | preconfirm  Add subscribers to their lists as confirmed, so double
+    |             opt-in lists send them no confirmation e-mail.
     |
     */
 
-    'preconfirm_subscriptions' => env('LISTMONK_PRECONFIRM_SUBSCRIPTIONS', true),
+    'preconfirm' => true,
 
     /*
     |--------------------------------------------------------------------------
-    | Queue Configuration
+    | Queue
     |--------------------------------------------------------------------------
     |
-    | Configure Laravel queue behavior for sync operations.
+    | connection  Queue connection of the sync jobs. Null uses the default
+    |             connection.
+    | name        Queue of the sync jobs. Null uses the default queue of
+    |             the connection.
     |
     */
 
     'queue' => [
-        'enabled' => env('LISTMONK_QUEUE_ENABLED', true),
-        'connection' => env('LISTMONK_QUEUE_CONNECTION', null),
-        'queue' => env('LISTMONK_QUEUE_NAME', null),
-        'delay' => env('LISTMONK_QUEUE_DELAY', 0),
-        'tries' => env('LISTMONK_QUEUE_TRIES', 3),
-        'backoff' => env('LISTMONK_QUEUE_BACKOFF', '10,30,60'),
+        'connection' => null,
+        'name' => null,
     ],
 
     /*
     |--------------------------------------------------------------------------
-    | Default Lists
+    | Storage
     |--------------------------------------------------------------------------
     |
-    | Default list IDs to subscribe users to. Can be overridden per-model
-    | by implementing getNewsletterLists() method.
+    | connection  Database connection of the subscriber table. Null uses the
+    |             default connection.
+    | table       Name of the subscriber table.
+    | model       Eloquent model of the table. It must extend the package's
+    |             own model: XLaravel\Listmonk\Models\Subscriber.
     |
     */
 
-    'default_lists' => [],
+    'connection' => null,
+
+    'subscriber' => [
+        'table' => 'listmonk_subscribers',
+        'model' => Subscriber::class,
+    ],
 
     /*
     |--------------------------------------------------------------------------
-    | Passive List
+    | Pruning
     |--------------------------------------------------------------------------
     |
-    | When a subscriber is deleted or soft-deleted, they can be moved to a
-    | "passive" list instead of being unsubscribed. Set to null to unsubscribe.
-    | Can be overridden per-model by implementing getNewsletterPassiveListId().
+    | Subscribers whose model no longer exists are left behind by deletes
+    | that skip model events, such as bulk queries and database cascades.
+    | The package schedules model:prune to remove them from Listmonk.
+    |
+    | enabled   Schedule the pruning.
+    | schedule  When the pruning runs, written in one of two ways:
+    |           A cron expression:
+    |             "30 3 * * *"        every day at 03:30
+    |
+    |           The name of a Laravel schedule frequency method, with its
+    |           arguments after a colon, separated by commas:
+    |             "daily"             every day at 00:00
+    |             "dailyAt:03:30"     every day at 03:30
+    |             "twiceDaily:1,13"   every day at 01:00 and 13:00
+    |             "weeklyOn:1,04:00"  every Monday at 04:00
+    | chunk     Rows removed by each query.
     |
     */
 
-    'passive_list_id' => env('LISTMONK_PASSIVE_LIST_ID', null),
+    'prune' => [
+        'enabled' => true,
+        'schedule' => 'daily',
+        'chunk' => 1000,
+    ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Email Change Behavior
-    |--------------------------------------------------------------------------
-    |
-    | When a user's email address changes, what should happen to the old email?
-    | - 'delete': Completely remove old email from Listmonk (default)
-    | - 'passive': Move old email to passive list (if configured)
-    |
-    */
-
-    'email_change_behavior' => env('LISTMONK_EMAIL_CHANGE_BEHAVIOR', 'delete'),
 ];

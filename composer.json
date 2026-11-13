@@ -1,65 +1,56 @@
 {
-  "name": "x-laravel/listmonk",
-  "description": "Laravel integration for Listmonk - Self-hosted newsletter and mailing list manager",
-  "keywords": [
-    "laravel",
-    "listmonk",
-    "newsletter",
-    "email",
-    "mailing-list",
-    "subscription"
-  ],
-  "type": "library",
-  "license": "MIT",
-  "authors": [
-    {
-      "name": "Mehmet ÖĞMEN",
-      "email": "www@mehmetogmen.com.tr",
-      "homepage": "https://www.mehmetogmen.com.tr",
-      "role": "Developer"
-    }
-  ],
-  "require": {
-    "php": "^8.1",
-    "illuminate/support": "^10.0|^11.0|^12.0",
-    "illuminate/http": "^10.0|^11.0|^12.0",
-    "illuminate/queue": "^10.0|^11.0|^12.0"
-  },
-  "require-dev": {
-    "orchestra/testbench": "^8.0|^9.0|^10.0",
-    "phpunit/phpunit": "^10.0|^11.0",
-    "mockery/mockery": "^1.5"
-  },
-  "autoload": {
-    "psr-4": {
-      "XLaravel\\Listmonk\\": "src/"
+    "name": "x-laravel/listmonk",
+    "description": "Listmonk subscribers for Eloquent models with queued syncing, list membership and cleanup of orphaned subscribers.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": ["laravel", "eloquent", "listmonk", "newsletter", "subscribers", "mailing-list"],
+    "authors": [
+        {
+            "name": "Mehmet ÖĞMEN",
+            "email": "www@mehmetogmen.com.tr",
+            "homepage": "https://www.mehmetogmen.com.tr",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8.4",
+        "illuminate/bus": "^13.0",
+        "illuminate/console": "^13.0",
+        "illuminate/contracts": "^13.0",
+        "illuminate/database": "^13.0",
+        "illuminate/http": "^13.0",
+        "illuminate/queue": "^13.0",
+        "illuminate/support": "^13.0"
     },
-    "files": [
-      "src/helpers.php"
-    ]
-  },
-  "autoload-dev": {
-    "psr-4": {
-      "XLaravel\\Listmonk\\Tests\\": "tests/"
-    }
-  },
-  "extra": {
-    "laravel": {
-      "providers": [
-        "XLaravel\\Listmonk\\ListmonkServiceProvider"
-      ],
-      "aliases": {
-        "Listmonk": "XLaravel\\Listmonk\\Facades\\Listmonk"
-      }
-    }
-  },
-  "scripts": {
-    "test": "vendor/bin/phpunit",
-    "test-coverage": "vendor/bin/phpunit --coverage-html coverage"
-  },
-  "config": {
-    "sort-packages": true,
-    "optimize-autoloader": true
-  },
-  "minimum-stability": "stable"
+    "require-dev": {
+        "larastan/larastan": "^3.0",
+        "orchestra/testbench": "^11.0",
+        "phpunit/phpunit": "^11.5 || ^12.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "XLaravel\\Listmonk\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "XLaravel\\Listmonk\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "XLaravel\\Listmonk\\ListmonkServiceProvider"
+            ]
+        }
+    },
+    "scripts": {
+        "analyse": "phpstan analyse",
+        "test": "phpunit"
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
 }
